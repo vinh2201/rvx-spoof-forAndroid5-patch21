@@ -21,6 +21,7 @@ val delayStartupNetworkPatch = bytecodePatch(
 
     execute {
         // 1. Kích hoạt đồng hồ đếm ngược 5 giây khi MainActivity khởi tạo
+/*
         mainActivityOnCreateFingerprint.methodOrThrow().apply {
             addInstructions(
                 0,
@@ -29,6 +30,7 @@ val delayStartupNetworkPatch = bytecodePatch(
                 """
             )
         }
+*/
 
         // 2. Quét và đánh lừa các hàm kiểm tra isConnected() trong toàn bộ ứng dụng
         classes.forEach { classDef ->
