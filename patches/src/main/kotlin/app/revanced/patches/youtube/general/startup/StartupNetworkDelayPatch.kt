@@ -20,19 +20,30 @@ val delayStartupNetworkPatch = bytecodePatch(
     compatibleWith(COMPATIBLE_PACKAGE)
 
     execute {
-        // 1. Kích hoạt đồng hồ đếm ngược 5 giây khi MainActivity khởi tạo
-/*
-        mainActivityOnCreateFingerprint.methodOrThrow().apply {
-            addInstructions(
-                0,
+        // 1. Hook an toàn vào onCreate: Tìm vị trí gọi super.onCreate để chèn sau nó, tránh chết Dalvik trên Android 5
+        val onCreateMethod = mainActivityOnCreateFingerprint.methodOrThrow()
+        val implementation = onCreateMethod.implementation
+        
+        if (implementation != null) {
+            val instructions = implementation.instructions.toList()
+            // Tìm dòng gọi hàm onCreate của lớp cha (invoke-super ... ->onCreate)
+            val superOnCreateIdx = instructions.indexOfFirst { 
+                it.toString().contains("->onCreate(") 
+            }
+            
+            // Nếu tìm thấy vị trí gọi super.onCreate, chèn ngay sau đó 1 lệnh (index + 1), ngược lại fallback về 0
+            val targetIndex = if (superOnCreateIdx != -1) superOnCreateIdx + 1 else 0
+            
+            val mutableMethod = onCreateMethod as MutableMethod
+            mutableMethod.addInstructions(
+                targetIndex,
                 """
                     invoke-static {}, $EXTENSION_CLASS_DESCRIPTOR->startStartupTimer()V
                 """
             )
         }
-*/
 
-        // 2. Quét và đánh lừa các hàm kiểm tra isConnected() trong toàn bộ ứng dụng
+        // 2. Quét và đánh lừa các hàm kiểm tra isConnected() toàn app
         classes.forEach { classDef ->
             classDef.methods.forEach { method ->
                 val implementation = method.implementation ?: return@forEach
@@ -53,7 +64,6 @@ val delayStartupNetworkPatch = bytecodePatch(
                         if (resultIndex < instructions.size) {
                             val moveInstruction = instructions[resultIndex]
 
-                            // Bắt kết quả trả về kiểu boolean (Z) của lệnh isConnected()
                             if (moveInstruction.opcode == Opcode.MOVE_RESULT) {
                                 val registerName = "v${(moveInstruction as OneRegisterInstruction).registerA}"
 
