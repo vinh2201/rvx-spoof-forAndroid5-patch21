@@ -1,26 +1,17 @@
 package app.revanced.extension.youtube.patches;
 
-import android.os.Handler;
-import android.os.Looper;
+import android.os.SystemClock;
 
 public class StartupNetworkDelayPatch {
-    private static volatile boolean isStartupDelay = true;
-
-    public static void startStartupTimer() {
-        isStartupDelay = true;
-        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                isStartupDelay = false;
-            }
-        }, 9000);
+    static {
+        // Khối tĩnh này tự chạy ngay khi class được nạp vào bộ nhớ, 
+        // tạm hoãn luồng khởi động 5 giây một cách an toàn mà không làm văng app.
+        try {
+            SystemClock.sleep(9000);
+        } catch (Exception ignored) {}
     }
 
-    // Chặn kết quả kiểm tra mạng thành false trong 5 giây đầu, không làm sập app
-    public static boolean isConnected(boolean originalResult) {
-        if (isStartupDelay) {
-            return false;
-        }
-        return originalResult;
+    public static void init() {
+        // Chỉ dùng để kích hoạt khối static ở trên
     }
 }

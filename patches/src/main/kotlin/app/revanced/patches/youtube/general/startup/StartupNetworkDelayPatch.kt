@@ -18,22 +18,15 @@ val delayStartupNetworkPatch = bytecodePatch(
     compatibleWith(COMPATIBLE_PACKAGE)
 
     execute {
-        // Hook an toàn sau super.onCreate để kích hoạt bộ đếm thời gian 5 giây
-        val onCreateMethod = mainActivityOnCreateFingerprint.methodOrThrow()
-        val implementation = onCreateMethod.implementation
-        
-        if (implementation != null) {
-            val instructions = implementation.instructions.toList()
-            val superOnCreateIdx = instructions.indexOfFirst { it.toString().contains("->onCreate(") }
-            val targetIndex = if (superOnCreateIdx != -1) superOnCreateIdx + 1 else 0
-            
-            (onCreateMethod as MutableMethod).addInstructions(
-                targetIndex,
+        // Chỉ gọi duy nhất 1 hàm khởi tạo tĩnh, để Java tự lo phần hoãn thời gian ngầm, 
+        // tuyệt đối không chèn lệnh linh tinh làm sập Dalvik trên Android 5.
+        mainActivityOnCreateFingerprint.methodOrThrow().apply {
+            (this as MutableMethod).addInstructions(
+                0,
                 """
-                    invoke-static {}, $EXTENSION_CLASS_DESCRIPTOR->startStartupTimer()V
+                    invoke-static {}, $EXTENSION_CLASS_DESCRIPTOR->init()V
                 """
             )
         }
-        // Đã cắt bỏ hoàn toàn việc quét bytecode hàng loạt để cứu con máy Android 5 khỏi lỗi VerifyError.
     }
 }
