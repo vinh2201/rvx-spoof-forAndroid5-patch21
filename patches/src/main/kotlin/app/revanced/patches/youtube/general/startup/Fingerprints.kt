@@ -7,13 +7,25 @@ internal val mainActivityOnCreateFingerprint = legacyFingerprint(
     returnType = "V",
     parameters = listOf("Landroid/os/Bundle;"),
     customFingerprint = { method, classDef ->
-        method.name == "onCreate" && classDef.type.endsWith("/MainActivity;")
+        method.name == "onCreate" && (
+            classDef.type.contains("WatchWhileActivity") ||
+            classDef.type.contains("MainActivity") ||
+            classDef.type.contains("YouTubeLauncherActivity")
+        )
     }
 )
 
 internal val networkInfoFingerprint = legacyFingerprint(
     name = "networkInfoFingerprint",
-    returnType = "Landroid/net/NetworkInfo;",
-    parameters = emptyList(),
-    strings = listOf("connectivity")
+    customFingerprint = { method, classDef ->
+        // Ưu tiên class Chromium cố định HOẶC bất kỳ hàm smali nào có gọi getActiveNetworkInfo
+        val isChromiumClass = classDef.type == "Lorg/chromium/net/NetworkChangeNotifierAutoDetect;" ||
+                              classDef.type == "Lorg/chromium/net/AndroidNetworkLibrary;"
+
+        val containsGetActiveNetworkInfo = method.implementation?.instructions?.any { instruction ->
+            instruction.toString().contains("ConnectivityManager;->getActiveNetworkInfo")
+        } == true
+
+        isChromiumClass || containsGetActiveNetworkInfo
+    }
 )

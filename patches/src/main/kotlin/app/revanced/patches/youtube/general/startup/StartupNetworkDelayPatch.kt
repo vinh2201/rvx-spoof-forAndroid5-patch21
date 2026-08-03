@@ -6,9 +6,9 @@ import app.revanced.patches.youtube.utils.compatibility.Constants.COMPATIBLE_PAC
 import app.revanced.patches.youtube.utils.extension.Constants.UTILS_PATH
 import app.revanced.patches.youtube.utils.patch.PatchList.STARTUP_NETWORK_DELAYED
 import app.revanced.util.fingerprint.methodOrThrow
-import app.revanced.util.indexOfFirstInstruction
 import app.revanced.util.indexOfFirstInstructionOrThrow
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 private const val EXTENSION_CLASS_DESCRIPTOR = "$UTILS_PATH/StartupNetworkDelayPatch;"
 
@@ -20,7 +20,7 @@ val delayStartupNetworkPatch = bytecodePatch(
     compatibleWith(COMPATIBLE_PACKAGE)
 
     execute {
-        // 1. Hook vào MainActivity.onCreate để kích hoạt bộ đếm 5 giây
+        // 1. Hook vào onCreate của WatchWhileActivity / MainActivity để kích hoạt bộ đếm 5 giây
         mainActivityOnCreateFingerprint.methodOrThrow().apply {
             addInstructions(
                 0,
@@ -30,14 +30,21 @@ val delayStartupNetworkPatch = bytecodePatch(
             )
         }
 
-        // 2. Hook vào hàm kiểm tra mạng của YouTube
+        // 2. Hook vào hàm kiểm tra mạng của YouTube (xử lý động thanh ghi)
         networkInfoFingerprint.methodOrThrow().apply {
+            // Tìm vị trí lệnh MOVE_RESULT_OBJECT (nơi lưu kết quả của getActiveNetworkInfo)
             val resultIndex = indexOfFirstInstructionOrThrow(Opcode.MOVE_RESULT_OBJECT)
+
+            // Trích xuất chính xác thanh ghi thực tế (v0, v1, v8...) mà YouTube đang sử dụng
+            val moveInstruction = implementation!!.instructions.elementAt(resultIndex) as OneRegisterInstruction
+            val registerName = "v${moveInstruction.register}"
+
+            // Chèn lệnh chẩn đoán mạng với đúng thanh ghi vừa bóc tách
             addInstructions(
                 resultIndex + 1,
                 """
-                    invoke-static {v0}, $EXTENSION_CLASS_DESCRIPTOR->getActiveNetworkInfo(Landroid/net/NetworkInfo;)Landroid/net/NetworkInfo;
-                    move-result-object v0
+                    invoke-static {$registerName}, $EXTENSION_CLASS_DESCRIPTOR->getActiveNetworkInfo(Landroid/net/NetworkInfo;)Landroid/net/NetworkInfo;
+                    move-result-object $registerName
                 """
             )
         }
