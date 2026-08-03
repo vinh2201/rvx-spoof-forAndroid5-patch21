@@ -85,6 +85,10 @@ public final class app/revanced/patches/music/general/startpage/ChangeStartPageP
 	public static final fun getChangeStartPagePatch ()Lapp/revanced/patcher/patch/BytecodePatch;
 }
 
+public final class app/revanced/patches/youtube/general/startup/StartupNetworkDelayPatchKt {
+	public static final fun getDelayStartupNetworkPatch ()Lapp/revanced/patcher/patch/BytecodePatch;
+}
+
 public final class app/revanced/patches/music/general/startpage/FingerprintsKt {
 	public static final field DEFAULT_BROWSE_ID Ljava/lang/String;
 }
