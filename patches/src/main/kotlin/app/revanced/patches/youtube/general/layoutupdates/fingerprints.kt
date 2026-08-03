@@ -18,14 +18,14 @@ internal val hotConfigPreferenceFingerprint = legacyFingerprint(
 internal val coldConfigPreferenceFingerprint = legacyFingerprint(
     name = "hotConfigPreferenceFingerprint",
     accessFlags = AccessFlags.PUBLIC or AccessFlags.FINAL,
-    parameters = emptyList(),
+    parameters = listOf("Larue;"),
     returnType = "V",
     strings = listOf(
         "com.google.android.libraries.youtube.innertube.cold_config_group",
         "com.google.android.libraries.youtube.innertube.cold_stored_timestamp",
         "com.google.android.libraries.youtube.innertube.cold_hash_data",
     ),
-    customFingerprint = { method, _ ->
-        method.parameters.size == 1
+    customFingerprint = { method, classDef ->
+        method.name == "c" && classDef.type == "Laaut;"
     }
 )
