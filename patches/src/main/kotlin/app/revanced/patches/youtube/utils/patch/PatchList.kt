@@ -289,6 +289,10 @@ internal enum class PatchList(
         "Freeze layout updates",
         "Freeze the current server-side layout. Mandatory for 17.34.36."
     ),
+    STARTUP_NETWORK_DELAYED(
+        "Delay startup network",
+        "Delayed the app connection to server for 5 seconds everytime opening the app."
+    ),
     ADD_MISSING_RESOURCES(
         "Add missing resources",
         "Add missing resources to prevent crashes in 17.34.36. Currently, only a few resources are supported. Also, replace missing drawables with a transparent image to prevent crashes."
