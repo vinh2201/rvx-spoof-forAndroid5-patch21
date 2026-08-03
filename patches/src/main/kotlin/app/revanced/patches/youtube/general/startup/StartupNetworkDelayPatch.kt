@@ -6,10 +6,6 @@ import app.revanced.patches.youtube.utils.compatibility.Constants.COMPATIBLE_PAC
 import app.revanced.patches.youtube.utils.extension.Constants.UTILS_PATH
 import app.revanced.patches.youtube.utils.patch.PatchList.STARTUP_NETWORK_DELAYED
 import app.revanced.util.fingerprint.methodOrThrow
-import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
-import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
-import com.android.tools.smali.dexlib2.Opcode
-import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
 private const val EXTENSION_CLASS_DESCRIPTOR = "$UTILS_PATH/patches/StartupNetworkDelayPatch;"
 
@@ -21,7 +17,7 @@ val delayStartupNetworkPatch = bytecodePatch(
     compatibleWith(COMPATIBLE_PACKAGE)
 
     execute {
-        // 1. Hook vào onCreate để kích hoạt bộ đếm 5 giây
+        // Chỉ cần kích hoạt đồng hồ đếm ngược 3 giây khi Activity chính được khởi tạo
         mainActivityOnCreateFingerprint.methodOrThrow().apply {
             addInstructions(
                 0,
@@ -30,47 +26,7 @@ val delayStartupNetworkPatch = bytecodePatch(
                 """
             )
         }
-
-        // 2. Quét an toàn toàn bộ các class/method trong APK tìm điểm nghẽn mạng
-        classes.forEach { classDef ->
-            classDef.methods.forEach { method ->
-                val implementation = method.implementation ?: return@forEach
-                val instructions = implementation.instructions.toList()
-
-                // Tìm tất cả các vị trí gọi lệnh getActiveNetworkInfo
-                val invokeIndices = mutableListOf<Int>()
-                instructions.forEachIndexed { index, instruction ->
-                    if (instruction.toString().contains("ConnectivityManager;->getActiveNetworkInfo")) {
-                        invokeIndices.add(index)
-                    }
-                }
-
-                if (invokeIndices.isNotEmpty()) {
-                    // Ép kiểu trực tiếp sang MutableMethod chuẩn của Patcher
-                    val mutableMethod = method as MutableMethod
-
-                    // Duyệt ngược từ dưới lên để chèn code không bị lệch chỉ số index
-                    invokeIndices.reversed().forEach { invokeIndex ->
-                        val resultIndex = invokeIndex + 1
-                        if (resultIndex < instructions.size) {
-                            val moveInstruction = instructions[resultIndex]
-
-                            if (moveInstruction.opcode == Opcode.MOVE_RESULT_OBJECT) {
-                                val registerName = "v${(moveInstruction as OneRegisterInstruction).registerA}"
-
-                                // Thực hiện add instructions trên method đã ép kiểu
-                                mutableMethod.addInstructions(
-                                    resultIndex + 1,
-                                    """
-                                        invoke-static {$registerName}, $EXTENSION_CLASS_DESCRIPTOR->getActiveNetworkInfo(Landroid/net/NetworkInfo;)Landroid/net/NetworkInfo;
-                                        move-result-object $registerName
-                                    """
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        
+        // Không quét mù toàn bộ APK nữa để đảm bảo sự ổn định tuyệt đối cho các luồng xử lý ngầm của YouTube.
     }
 }

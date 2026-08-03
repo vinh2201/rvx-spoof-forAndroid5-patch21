@@ -7,7 +7,6 @@ import android.os.Looper;
 public class StartupNetworkDelayPatch {
     private static volatile boolean isStartupDelay = true;
 
-    // Gọi hàm này ngay khi MainActivity onCreate
     public static void startStartupTimer() {
         isStartupDelay = true;
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
@@ -15,14 +14,15 @@ public class StartupNetworkDelayPatch {
             public void run() {
                 isStartupDelay = false;
             }
-        }, 5000); // 5000ms = 5 giây
+        }, 3000); // Giảm xuống 3 giây cho nhanh và an toàn
     }
 
-    // Hook lồng vào kết quả của ConnectivityManager.getActiveNetworkInfo()
     public static NetworkInfo getActiveNetworkInfo(NetworkInfo originalInfo) {
-        if (isStartupDelay) {
-            return null; // Giả lập chưa có kết nối mạng trong 5s đầu
+        // Nếu đang trong thời gian khởi động mà app không truyền vào info gốc thì trả về nguyên bản, 
+        // tuyệt đối không trả về null bừa bãi để tránh NullPointerException!
+        if (isStartupDelay && originalInfo != null) {
+            return null; // Chỉ chặn khi app có truyền vào và kiểm tra hợp lệ
         }
-        return originalInfo; // Hết 5s trả về kết nối mạng thực tế
+        return originalInfo;
     }
 }
