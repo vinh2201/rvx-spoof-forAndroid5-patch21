@@ -6,8 +6,6 @@ import app.revanced.patches.youtube.utils.compatibility.Constants.COMPATIBLE_PAC
 import app.revanced.patches.youtube.utils.extension.Constants.UTILS_PATH
 import app.revanced.patches.youtube.utils.patch.PatchList.STARTUP_NETWORK_DELAYED
 import app.revanced.util.fingerprint.methodOrThrow
-import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
-import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
@@ -31,32 +29,32 @@ val delayStartupNetworkPatch = bytecodePatch(
             )
         }
 
-        // 2. Tự động quét toàn bộ APK bằng mutableMethods để có quyền bơm code
+        // 2. Quét an toàn toàn bộ các class/method trong APK tìm điểm nghẽn mạng
         classes.forEach { classDef ->
-            classDef.mutableMethods.forEach { method ->
+            classDef.methods.forEach { method ->
                 val implementation = method.implementation ?: return@forEach
                 val instructions = implementation.instructions.toList()
 
-                // Dò xem hàm này có gọi getActiveNetworkInfo không?
-                val invokeIndices = instructions.mapIndexedNotNull { index, instruction ->
-                    if (instruction.toString().contains("ConnectivityManager;->getActiveNetworkInfo")) index else null
+                // Tìm tất cả các vị trí gọi lệnh getActiveNetworkInfo
+                val invokeIndices = mutableListOf<Int>()
+                instructions.forEachIndexed { index, instruction ->
+                    if (instruction.toString().contains("ConnectivityManager;->getActiveNetworkInfo")) {
+                        invokeIndices.add(index)
+                    }
                 }
 
-                // Nếu có, duyệt ngược từ dưới lên để chèn code (chống lệch chỉ số dòng)
-                invokeIndices.reversed().forEach { invokeIndex ->
-                    val resultIndex = invokeIndex + 1
-                    
-                    if (resultIndex < instructions.size) {
-                        val moveInstruction = instructions[resultIndex]
+                if (invokeIndices.isNotEmpty()) {
+                    // Duyệt ngược từ dưới lên để chèn code không bị lệch chỉ số index
+                    invokeIndices.reversed().forEach { invokeIndex ->
+                        val resultIndex = invokeIndex + 1
+                        if (resultIndex < instructions.size) {
+                            val moveInstruction = instructions[resultIndex]
 
-                        // Đảm bảo lệnh tiếp theo đúng là lưu kết quả mạng
-                        if (moveInstruction.opcode == Opcode.MOVE_RESULT_OBJECT) {
-                            // Trích xuất đúng thanh ghi (v0, v1, v8...) của từng chỗ
-                            val registerName = "v${(moveInstruction as OneRegisterInstruction).registerA}"
+                            if (moveInstruction.opcode == Opcode.MOVE_RESULT_OBJECT) {
+                                val registerName = "v${(moveInstruction as OneRegisterInstruction).registerA}"
 
-                            // Bơm code giả lập offline 5s vào
-                            method.apply {
-                                addInstructions(
+                                // Thực hiện add instructions trực tiếp trên method hiện tại
+                                method.addInstructions(
                                     resultIndex + 1,
                                     """
                                         invoke-static {$registerName}, $EXTENSION_CLASS_DESCRIPTOR->getActiveNetworkInfo(Landroid/net/NetworkInfo;)Landroid/net/NetworkInfo;
