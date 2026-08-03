@@ -14,13 +14,3 @@ internal val mainActivityOnCreateFingerprint = legacyFingerprint(
         )
     }
 )
-
-internal val networkInfoFingerprint = legacyFingerprint(
-    name = "networkInfoFingerprint",
-    customFingerprint = { method, _ ->
-        // Chỉ đích danh các hàm có chứa lệnh lấy thông tin mạng (bỏ qua các hàm rác của Chromium)
-        method.implementation?.instructions?.any { instruction ->
-            instruction.toString().contains("ConnectivityManager;->getActiveNetworkInfo")
-        } == true
-    }
-)

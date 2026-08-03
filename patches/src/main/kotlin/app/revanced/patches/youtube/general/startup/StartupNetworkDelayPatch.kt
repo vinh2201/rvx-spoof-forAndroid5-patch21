@@ -9,7 +9,7 @@ import app.revanced.util.fingerprint.methodOrThrow
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
-// Đường dẫn trỏ tới file Java bên project Extension (Lapp/revanced/extension/youtube/StartupNetworkDelayPatch;)
+// Đã thêm /patches/ vào đường dẫn để khớp với thư mục Java của bạn
 private const val EXTENSION_CLASS_DESCRIPTOR = "$UTILS_PATH/patches/StartupNetworkDelayPatch;"
 
 @Suppress("unused")
@@ -20,7 +20,7 @@ val delayStartupNetworkPatch = bytecodePatch(
     compatibleWith(COMPATIBLE_PACKAGE)
 
     execute {
-        // 1. Hook vào onCreate
+        // 1. Hook vào onCreate để kích hoạt bộ đếm 5 giây
         mainActivityOnCreateFingerprint.methodOrThrow().apply {
             addInstructions(
                 0,
@@ -30,36 +30,43 @@ val delayStartupNetworkPatch = bytecodePatch(
             )
         }
 
-        // 2. Hook vào hàm kiểm tra mạng cực kỳ cẩn thận
-        networkInfoFingerprint.methodOrThrow().apply {
-            val instructions = implementation!!.instructions.toList()
+        // 2. Tự động quét toàn bộ APK để patch TẤT CẢ các chỗ gọi hàm mạng (Thay thế cho Fingerprint)
+        classes.forEach { classDef ->
+            classDef.methods.forEach { method ->
+                val implementation = method.implementation ?: return@forEach
+                val instructions = implementation.instructions.toList()
 
-            // Tìm đích xác vị trí dòng lệnh gọi hàm mạng
-            val invokeIndex = instructions.indexOfFirst {
-                it.toString().contains("ConnectivityManager;->getActiveNetworkInfo")
+                // Dò xem hàm này có gọi getActiveNetworkInfo không?
+                val invokeIndices = instructions.mapIndexedNotNull { index, instruction ->
+                    if (instruction.toString().contains("ConnectivityManager;->getActiveNetworkInfo")) index else null
+                }
+
+                // Nếu có, duyệt ngược từ dưới lên để chèn code (chống lệch dòng)
+                invokeIndices.reversed().forEach { invokeIndex ->
+                    val resultIndex = invokeIndex + 1
+                    
+                    if (resultIndex < instructions.size) {
+                        val moveInstruction = instructions[resultIndex]
+
+                        // Đảm bảo lệnh tiếp theo đúng là lưu kết quả mạng
+                        if (moveInstruction.opcode == Opcode.MOVE_RESULT_OBJECT) {
+                            // Trích xuất đúng thanh ghi (v0, v1, v8...) của từng chỗ
+                            val registerName = "v${(moveInstruction as OneRegisterInstruction).registerA}"
+
+                            // Bơm code giả lập offline 5s vào
+                            method.apply {
+                                addInstructions(
+                                    resultIndex + 1,
+                                    """
+                                        invoke-static {$registerName}, $EXTENSION_CLASS_DESCRIPTOR->getActiveNetworkInfo(Landroid/net/NetworkInfo;)Landroid/net/NetworkInfo;
+                                        move-result-object $registerName
+                                    """
+                                )
+                            }
+                        }
+                    }
+                }
             }
-            if (invokeIndex == -1) error("Không tìm thấy lệnh getActiveNetworkInfo trong hàm này")
-
-            // Trong cấu trúc Dalvik, lệnh nhận kết quả (move-result-object) luôn nằm NGAY SAU lệnh invoke
-            val resultIndex = invokeIndex + 1
-            val moveInstruction = instructions[resultIndex]
-
-            // Double-check xem nó có đúng là lệnh move-result-object không
-            if (moveInstruction.opcode != Opcode.MOVE_RESULT_OBJECT) {
-                error("Lệnh theo sau không phải move-result-object, mà là: ${moveInstruction.opcode}")
-            }
-
-            // Trích xuất thanh ghi
-            val registerName = "v${(moveInstruction as OneRegisterInstruction).registerA}"
-
-            // Chèn lệnh giả lập mạng vào sau nó
-            addInstructions(
-                resultIndex + 1,
-                """
-                    invoke-static {$registerName}, $EXTENSION_CLASS_DESCRIPTOR->getActiveNetworkInfo(Landroid/net/NetworkInfo;)Landroid/net/NetworkInfo;
-                    move-result-object $registerName
-                """
-            )
         }
     }
 }
