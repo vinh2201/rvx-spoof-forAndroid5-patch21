@@ -20,22 +20,16 @@ val delayStartupNetworkPatch = bytecodePatch(
     compatibleWith(COMPATIBLE_PACKAGE)
 
     execute {
-        // 1. Hook an toàn vào onCreate: Tìm vị trí gọi super.onCreate để chèn sau nó, tránh chết Dalvik trên Android 5
+        // 1. Hook an toàn sau super.onCreate để kích hoạt bộ đếm 5 giây
         val onCreateMethod = mainActivityOnCreateFingerprint.methodOrThrow()
         val implementation = onCreateMethod.implementation
         
         if (implementation != null) {
             val instructions = implementation.instructions.toList()
-            // Tìm dòng gọi hàm onCreate của lớp cha (invoke-super ... ->onCreate)
-            val superOnCreateIdx = instructions.indexOfFirst { 
-                it.toString().contains("->onCreate(") 
-            }
-            
-            // Nếu tìm thấy vị trí gọi super.onCreate, chèn ngay sau đó 1 lệnh (index + 1), ngược lại fallback về 0
+            val superOnCreateIdx = instructions.indexOfFirst { it.toString().contains("->onCreate(") }
             val targetIndex = if (superOnCreateIdx != -1) superOnCreateIdx + 1 else 0
             
-            val mutableMethod = onCreateMethod as MutableMethod
-            mutableMethod.addInstructions(
+            (onCreateMethod as MutableMethod).addInstructions(
                 targetIndex,
                 """
                     invoke-static {}, $EXTENSION_CLASS_DESCRIPTOR->startStartupTimer()V
@@ -43,11 +37,11 @@ val delayStartupNetworkPatch = bytecodePatch(
             )
         }
 
-        // 2. Quét và đánh lừa các hàm kiểm tra isConnected() toàn app
-        classes.forEach { classDef ->
+        // 2. CHỈ quét các class của riêng YouTube, loại bỏ hoàn toàn Play Services và thư viện ngoài để tránh VerifyError trên Android 5
+        classes.filter { it.type.contains("youtube") }.forEach { classDef ->
             classDef.methods.forEach { method ->
-                val implementation = method.implementation ?: return@forEach
-                val instructions = implementation.instructions.toList()
+                val methodImpl = method.implementation ?: return@forEach
+                val instructions = methodImpl.instructions.toList()
 
                 val matchIndices = mutableListOf<Int>()
                 instructions.forEachIndexed { index, instruction ->
