@@ -6,6 +6,9 @@ import app.revanced.patches.youtube.utils.compatibility.Constants.COMPATIBLE_PAC
 import app.revanced.patches.youtube.utils.extension.Constants.UTILS_PATH
 import app.revanced.patches.youtube.utils.patch.PatchList.STARTUP_NETWORK_DELAYED
 import app.revanced.util.fingerprint.methodOrThrow
+import app.revanced.patcher.util.proxy.mutableTypes.toMutable
+import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
+import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod.Companion.toMutable
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
@@ -44,6 +47,9 @@ val delayStartupNetworkPatch = bytecodePatch(
                 }
 
                 if (invokeIndices.isNotEmpty()) {
+                    // Phù phép chuyển thành MutableMethod để có quyền bơm code Smali
+                    val mutableMethod = method.toMutable()
+
                     // Duyệt ngược từ dưới lên để chèn code không bị lệch chỉ số index
                     invokeIndices.reversed().forEach { invokeIndex ->
                         val resultIndex = invokeIndex + 1
@@ -53,8 +59,8 @@ val delayStartupNetworkPatch = bytecodePatch(
                             if (moveInstruction.opcode == Opcode.MOVE_RESULT_OBJECT) {
                                 val registerName = "v${(moveInstruction as OneRegisterInstruction).registerA}"
 
-                                // Thực hiện add instructions trực tiếp trên method hiện tại
-                                method.addInstructions(
+                                // Thực hiện add instructions trên method đã được cấp quyền mutable
+                                mutableMethod.addInstructions(
                                     resultIndex + 1,
                                     """
                                         invoke-static {$registerName}, $EXTENSION_CLASS_DESCRIPTOR->getActiveNetworkInfo(Landroid/net/NetworkInfo;)Landroid/net/NetworkInfo;
