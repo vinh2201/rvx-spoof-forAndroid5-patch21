@@ -11,7 +11,7 @@ internal val hotConfigPreferenceFingerprint = legacyFingerprint(
     returnType = "V",
     strings = listOf("com.google.android.libraries.youtube.innertube.hot_stored_timestamp"),
     customFingerprint = { method, classDef ->
-        method.name == "run" && classDef.type == "Lusi;"
+        method.name == "run" && classDef.type == "Laauq;"
     }
 )
 
@@ -26,6 +26,6 @@ internal val coldConfigPreferenceFingerprint = legacyFingerprint(
         "com.google.android.libraries.youtube.innertube.cold_hash_data",
     ),
     customFingerprint = { method, classDef ->
-        method.name == "o" && classDef.type == "Lutm;"
+        method.name == "c" && classDef.type == "Laaut;"
     }
 )
