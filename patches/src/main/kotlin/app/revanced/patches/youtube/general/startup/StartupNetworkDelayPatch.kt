@@ -47,8 +47,8 @@ val delayStartupNetworkPatch = bytecodePatch(
                 }
 
                 if (invokeIndices.isNotEmpty()) {
-                    // Phù phép chuyển thành MutableMethod để có quyền bơm code Smali
-                    val mutableMethod = method.toMutable()
+                    // Ép kiểu trực tiếp sang MutableMethod chuẩn của Patcher
+                    val mutableMethod = method as MutableMethod
 
                     // Duyệt ngược từ dưới lên để chèn code không bị lệch chỉ số index
                     invokeIndices.reversed().forEach { invokeIndex ->
@@ -59,7 +59,7 @@ val delayStartupNetworkPatch = bytecodePatch(
                             if (moveInstruction.opcode == Opcode.MOVE_RESULT_OBJECT) {
                                 val registerName = "v${(moveInstruction as OneRegisterInstruction).registerA}"
 
-                                // Thực hiện add instructions trên method đã được cấp quyền mutable
+                                // Thực hiện add instructions trên method đã ép kiểu
                                 mutableMethod.addInstructions(
                                     resultIndex + 1,
                                     """
