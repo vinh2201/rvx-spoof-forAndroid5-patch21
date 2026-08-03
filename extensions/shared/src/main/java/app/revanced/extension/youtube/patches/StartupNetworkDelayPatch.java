@@ -1,6 +1,5 @@
 package app.revanced.extension.youtube.patches;
 
-import android.net.NetworkInfo;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -14,15 +13,14 @@ public class StartupNetworkDelayPatch {
             public void run() {
                 isStartupDelay = false;
             }
-        }, 3000); // Giảm xuống 3 giây cho nhanh và an toàn
+        }, 9000);
     }
 
-    public static NetworkInfo getActiveNetworkInfo(NetworkInfo originalInfo) {
-        // Nếu đang trong thời gian khởi động mà app không truyền vào info gốc thì trả về nguyên bản, 
-        // tuyệt đối không trả về null bừa bãi để tránh NullPointerException!
-        if (isStartupDelay && originalInfo != null) {
-            return null; // Chỉ chặn khi app có truyền vào và kiểm tra hợp lệ
+    // Chặn kết quả kiểm tra mạng thành false trong 5 giây đầu, không làm sập app
+    public static boolean isConnected(boolean originalResult) {
+        if (isStartupDelay) {
+            return false;
         }
-        return originalInfo;
+        return originalResult;
     }
 }
