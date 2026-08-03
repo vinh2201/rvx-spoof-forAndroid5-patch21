@@ -17,15 +17,10 @@ internal val mainActivityOnCreateFingerprint = legacyFingerprint(
 
 internal val networkInfoFingerprint = legacyFingerprint(
     name = "networkInfoFingerprint",
-    customFingerprint = { method, classDef ->
-        // Ưu tiên class Chromium cố định HOẶC bất kỳ hàm smali nào có gọi getActiveNetworkInfo
-        val isChromiumClass = classDef.type == "Lorg/chromium/net/NetworkChangeNotifierAutoDetect;" ||
-                              classDef.type == "Lorg/chromium/net/AndroidNetworkLibrary;"
-
-        val containsGetActiveNetworkInfo = method.implementation?.instructions?.any { instruction ->
+    customFingerprint = { method, _ ->
+        // Chỉ đích danh các hàm có chứa lệnh lấy thông tin mạng (bỏ qua các hàm rác của Chromium)
+        method.implementation?.instructions?.any { instruction ->
             instruction.toString().contains("ConnectivityManager;->getActiveNetworkInfo")
         } == true
-
-        isChromiumClass || containsGetActiveNetworkInfo
     }
 )
