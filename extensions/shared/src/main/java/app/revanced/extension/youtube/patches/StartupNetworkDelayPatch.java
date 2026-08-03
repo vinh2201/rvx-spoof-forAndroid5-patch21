@@ -1,17 +1,15 @@
 package app.revanced.extension.youtube.patches;
 
-import android.os.SystemClock;
-
 public class StartupNetworkDelayPatch {
-    static {
-        // Khối tĩnh này tự chạy ngay khi class được nạp vào bộ nhớ, 
-        // tạm hoãn luồng khởi động 5 giây một cách an toàn mà không làm văng app.
-        try {
-            SystemClock.sleep(9000);
-        } catch (Exception ignored) {}
-    }
+    // Ghi nhận thời điểm class này được nạp vào bộ nhớ (lúc app khởi động)
+    private static final long START_TIME = System.currentTimeMillis();
+    private static final long DELAY_MS = 9000; // 5000 mili-giây = 5 giây
 
-    public static void init() {
-        // Chỉ dùng để kích hoạt khối static ở trên
+    /**
+     * @return true nếu chưa qua 5 giây (đang giả mạo ngắt mạng)
+     *         false nếu đã qua 5 giây (trả lại luồng chạy bình thường)
+     */
+    public static boolean isSpoofing() {
+        return (System.currentTimeMillis() - START_TIME) < DELAY_MS;
     }
 }

@@ -8,6 +8,7 @@ import app.revanced.patches.youtube.utils.patch.PatchList.STARTUP_NETWORK_DELAYE
 import app.revanced.util.fingerprint.methodOrThrow
 import app.revanced.patcher.util.proxy.mutableTypes.MutableMethod
 
+// Đường dẫn trỏ tới class Java ta vừa viết ở trên
 private const val EXTENSION_CLASS_DESCRIPTOR = "$UTILS_PATH/patches/StartupNetworkDelayPatch;"
 
 @Suppress("unused")
@@ -18,13 +19,24 @@ val delayStartupNetworkPatch = bytecodePatch(
     compatibleWith(COMPATIBLE_PACKAGE)
 
     execute {
-        // Chỉ gọi duy nhất 1 hàm khởi tạo tĩnh, để Java tự lo phần hoãn thời gian ngầm, 
-        // tuyệt đối không chèn lệnh linh tinh làm sập Dalvik trên Android 5.
-        mainActivityOnCreateFingerprint.methodOrThrow().apply {
+        // Tìm hàm kiểm tra mạng bằng Fingerprint
+        networkCheckFingerprint.methodOrThrow().apply {
             (this as MutableMethod).addInstructions(
-                0,
+                0, // Tiêm ngay vào dòng đầu tiên của hàm
                 """
-                    invoke-static {}, $EXTENSION_CLASS_DESCRIPTOR->init()V
+                    # Gọi hàm Java của chúng ta để kiểm tra xem có đang trong 5 giây đầu không
+                    invoke-static {}, $EXTENSION_CLASS_DESCRIPTOR->isSpoofing()Z
+                    move-result v0
+                    
+                    # Nếu isSpoofing trả về 0 (false - đã qua 5s), nhảy tới nhãn :continue_flow để chạy mạng bình thường
+                    if-nez v0, :continue_flow
+                    
+                    # Nếu chưa qua 5 giây, ép thanh ghi v0 thành 0 (false) và return luôn -> App tưởng mất mạng
+                    const/4 v0, 0x0
+                    return v0
+                    
+                    # Nhãn tiếp tục luồng bình thường của app
+                    :continue_flow
                 """
             )
         }
