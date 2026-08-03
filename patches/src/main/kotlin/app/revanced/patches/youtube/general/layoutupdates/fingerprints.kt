@@ -25,7 +25,7 @@ internal val coldConfigPreferenceFingerprint = legacyFingerprint(
         "com.google.android.libraries.youtube.innertube.cold_stored_timestamp",
         "com.google.android.libraries.youtube.innertube.cold_hash_data",
     ),
-    customFingerprint = { method, classDef ->
-        method.name == "c" && classDef.type == "Laaut;"
+    customFingerprint = { method, _ ->
+        method.parameters.size == 1
     }
 )
