@@ -37,7 +37,7 @@ val delayStartupNetworkPatch = bytecodePatch(
 
             // Trích xuất chính xác thanh ghi thực tế (v0, v1, v8...) mà YouTube đang sử dụng
             val moveInstruction = implementation!!.instructions.elementAt(resultIndex) as OneRegisterInstruction
-            val registerName = "v${moveInstruction.register}"
+            val registerName = "v${moveInstruction.registerA}"
 
             // Chèn lệnh chẩn đoán mạng với đúng thanh ghi vừa bóc tách
             addInstructions(
