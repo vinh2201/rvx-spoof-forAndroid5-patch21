@@ -9,7 +9,6 @@ import app.revanced.util.fingerprint.methodOrThrow
 import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
 
-// Đã thêm /patches/ vào đường dẫn để khớp với thư mục Java của bạn
 private const val EXTENSION_CLASS_DESCRIPTOR = "$UTILS_PATH/patches/StartupNetworkDelayPatch;"
 
 @Suppress("unused")
@@ -30,9 +29,9 @@ val delayStartupNetworkPatch = bytecodePatch(
             )
         }
 
-        // 2. Tự động quét toàn bộ APK để patch TẤT CẢ các chỗ gọi hàm mạng (Thay thế cho Fingerprint)
+        // 2. Tự động quét toàn bộ APK bằng mutableMethods để có quyền bơm code
         classes.forEach { classDef ->
-            classDef.methods.forEach { method ->
+            classDef.mutableMethods.forEach { method ->
                 val implementation = method.implementation ?: return@forEach
                 val instructions = implementation.instructions.toList()
 
@@ -41,7 +40,7 @@ val delayStartupNetworkPatch = bytecodePatch(
                     if (instruction.toString().contains("ConnectivityManager;->getActiveNetworkInfo")) index else null
                 }
 
-                // Nếu có, duyệt ngược từ dưới lên để chèn code (chống lệch dòng)
+                // Nếu có, duyệt ngược từ dưới lên để chèn code (chống lệch chỉ số dòng)
                 invokeIndices.reversed().forEach { invokeIndex ->
                     val resultIndex = invokeIndex + 1
                     
