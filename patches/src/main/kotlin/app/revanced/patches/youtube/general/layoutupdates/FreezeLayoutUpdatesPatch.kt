@@ -10,6 +10,8 @@ import app.revanced.patches.youtube.utils.settings.settingsPatch
 import app.revanced.util.fingerprint.matchOrThrow
 import app.revanced.util.indexOfFirstInstructionOrThrow
 import com.android.tools.smali.dexlib2.Opcode
+import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
+import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 private const val EXTENSION_CLASS_DESCRIPTOR = "$UTILS_PATH/FreezeLayoutUpdatesPatch;"
 
@@ -61,8 +63,11 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
                         move-result-object v3
                     """)
 
+                // Tìm chính xác lệnh gọi Android Base64.encodeToString thông qua ReferenceInstruction
                 val encodeToStringIndex = indexOfFirstInstructionOrThrow(match.stringMatches!![0].index) {
-                    opcode == Opcode.INVOKE_STATIC && toString().contains("Base64;->encodeToString")
+                    if (opcode != Opcode.INVOKE_STATIC && opcode != Opcode.INVOKE_STATIC_RANGE) return@indexOfFirstInstructionOrThrow false
+                    val methodRef = (this as? ReferenceInstruction)?.reference as? MethodReference
+                    methodRef?.definingClass == "Landroid/util/Base64;" && methodRef.name == "encodeToString"
                 }
 
                 val coldConfigGroupResultIndex = indexOfFirstInstructionOrThrow(encodeToStringIndex, Opcode.MOVE_RESULT_OBJECT)
