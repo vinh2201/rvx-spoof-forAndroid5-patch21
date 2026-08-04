@@ -1,83 +1,69 @@
 package app.revanced.extension.youtube.patches.utils;
 
-import app.revanced.extension.youtube.settings.Settings;
+// import app.revanced.extension.youtube.settings.Settings;
+import android.os.SystemClock;
 
 @SuppressWarnings("unused")
 public class FreezeLayoutUpdatesPatch {
 
-    // Chỉ lưu đúng thời gian bắt đầu
-    private static final long START_TIME = System.currentTimeMillis();
+    // Dùng elapsedRealtime an toàn hơn currentTimeMillis cho việc đếm giờ lúc khởi động
+    private static final long START_TIME = SystemClock.elapsedRealtime();
     private static final long DELAY_MS = 15000; // 15 giây
 
+    // Bộ nhớ đệm (Cache) để lưu trữ config lúc app mới mở
+    private static String cachedHotConfigGroup = null;
+    private static String cachedHotHashData = null;
+    private static String cachedColdConfigGroup = null;
+    private static String cachedColdHashData = null;
+
     /**
-     * Hàm kiểm tra an toàn
+     * Kiểm tra xem đã qua 15 giây chưa
      */
-    private static boolean isReadyToSpoof() {
-        return (System.currentTimeMillis() - START_TIME) >= DELAY_MS;
+    private static boolean isReadyToFreeze() {
+        return (SystemClock.elapsedRealtime() - START_TIME) >= DELAY_MS;
     }
 
     public static String getHotConfigGroup(String original) {
-        // Trả về gốc ngay lập tức, tránh đụng vào Settings khi app chưa sẵn sàng
-        if (!isReadyToSpoof()) return original; 
-        
-        try {
-            if (Settings.FREEZE_LAYOUT_UPDATES.get()) {
-                boolean disableLayoutUpdates = Settings.DISABLE_LAYOUT_UPDATES.get();
-                String savedValue = Settings.FROZEN_HOT_CONFIG_GROUP.get();
-                
-                if (disableLayoutUpdates || savedValue == null || savedValue.isEmpty()) {
-                    return null;
-                }
-                return savedValue;
+        if (!isReadyToFreeze()) {
+            // Trong 15s đầu: LƯU LẠI config gốc chuẩn bị cho việc đóng băng
+            if (original != null && !original.isEmpty()) {
+                cachedHotConfigGroup = original;
             }
-        } catch (Exception e) {
-            // Lỗi thì nuốt luôn, trả về original cho an toàn
+            return original; // Vẫn cho app load bình thường
         }
-        return original;
+        
+        // Sau 15s: Bắt đầu đóng băng! 
+        // Trả về dữ liệu đã lưu, nếu không có thì mới đành dùng đồ zin
+        return (cachedHotConfigGroup != null) ? cachedHotConfigGroup : original;
     }
 
     public static String getHotHashData(String original) {
-        if (!isReadyToSpoof()) return original;
-        
-        try {
-            if (Settings.FREEZE_LAYOUT_UPDATES.get()) {
-                if (Settings.DISABLE_LAYOUT_UPDATES.get()) {
-                    return "";
-                }
-                return Settings.FROZEN_HOT_HASH_DATA.get();
+        if (!isReadyToFreeze()) {
+            if (original != null && !original.isEmpty()) {
+                cachedHotHashData = original;
             }
-        } catch (Exception e) {}
-        return original;
+            return original;
+        }
+        return (cachedHotHashData != null) ? cachedHotHashData : original;
     }
 
     public static String getColdConfigGroup(String original) {
-        if (!isReadyToSpoof()) return original;
-        
-        try {
-            if (Settings.FREEZE_LAYOUT_UPDATES.get()) {
-                boolean disableLayoutUpdates = Settings.DISABLE_LAYOUT_UPDATES.get();
-                String savedValue = Settings.FROZEN_COLD_CONFIG_GROUP.get();
-                
-                if (disableLayoutUpdates || savedValue == null || savedValue.isEmpty()) {
-                    return null;
-                }
-                return savedValue;
+        if (!isReadyToFreeze()) {
+            if (original != null && !original.isEmpty()) {
+                cachedColdConfigGroup = original;
             }
-        } catch (Exception e) {}
-        return original;
+            return original;
+        }
+        return (cachedColdConfigGroup != null) ? cachedColdConfigGroup : original;
     }
 
     public static String getColdHashData(String original) {
-        if (!isReadyToSpoof()) return original;
-        
-        try {
-            if (Settings.FREEZE_LAYOUT_UPDATES.get()) {
-                if (Settings.DISABLE_LAYOUT_UPDATES.get()) {
-                    return "";
-                }
-                return Settings.FROZEN_COLD_HASH_DATA.get();
+        if (!isReadyToFreeze()) {
+            if (original != null && !original.isEmpty()) {
+                cachedColdHashData = original;
             }
-        } catch (Exception e) {}
-        return original;
+            return original;
+        }
+        return (cachedColdHashData != null) ? cachedColdHashData : original;
     }
 }
