@@ -5,34 +5,13 @@ import app.revanced.patcher.patch.bytecodePatch
 import app.revanced.patches.youtube.utils.compatibility.Constants.COMPATIBLE_PACKAGE
 import app.revanced.patches.youtube.utils.extension.Constants.UTILS_PATH
 import app.revanced.patches.youtube.utils.patch.PatchList.FREEZE_LAYOUT_UPDATES
+import app.revanced.patches.youtube.utils.settings.ResourceUtils.addPreference
+import app.revanced.patches.youtube.utils.settings.settingsPatch
 import app.revanced.util.fingerprint.matchOrThrow
 import app.revanced.util.indexOfFirstInstructionOrThrow
 import com.android.tools.smali.dexlib2.Opcode
-import com.android.tools.smali.dexlib2.iface.instruction.FiveRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.Instruction
-import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.RegisterRangeInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.ThreeRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.TwoRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 private const val EXTENSION_CLASS_DESCRIPTOR = "$UTILS_PATH/FreezeLayoutUpdatesPatch;"
-
-/**
- * Hàm hỗ trợ lấy chính xác tên thanh ghi đích (VD: "v1", "v3", "v4") từ bất kỳ loại lệnh Smali nào.
- */
-private fun Instruction.getRegister(): String {
-    val reg = when (this) {
-        is OneRegisterInstruction -> registerA
-        is TwoRegisterInstruction -> registerA
-        is ThreeRegisterInstruction -> registerA
-        is FiveRegisterInstruction -> registerC
-        is RegisterRangeInstruction -> startRegister
-        else -> error("Lệnh ${opcode.name} không hỗ trợ trích xuất thanh ghi A.")
-    }
-    return "v$reg"
-}
 
 @Suppress("unused")
 val freezeLayoutUpdatesPatch = bytecodePatch(
@@ -40,82 +19,82 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
     FREEZE_LAYOUT_UPDATES.summary
 ) {
     compatibleWith(COMPATIBLE_PACKAGE)
+    // dependsOn(settingsPatch)
 
     execute {
+        // ==========================================
+        // 1. XỬ LÝ HOT CONFIG (Chặn lúc ĐỌC - READ)
+        // ==========================================
         hotConfigPreferenceFingerprint.matchOrThrow().let { match ->
             match.method.apply {
-                // --- 1. HOT CONFIG GROUP ---
-                val hotStoredTimestampStrIndex = match.stringMatches!!.first().index
-                
-                // Tìm ngược từ vị trí "hot_stored_timestamp", lấy lệnh move-result-object gần nhất
-                val hotConfigGroupResultIndex = implementation!!.instructions.take(hotStoredTimestampStrIndex)
-                    .indexOfLast { it.opcode == Opcode.MOVE_RESULT_OBJECT }
-                
-                val hotConfigReg = implementation!!.instructions.elementAt(hotConfigGroupResultIndex).getRegister()
+                // Trong aauq.smali (hàm run):
+                // Lệnh move-result-object thứ 1 là của Lazyx->get() (thanh ghi v2)
+                // Lệnh move-result-object thứ 2 là của SharedPreferences->getString() (thanh ghi v1)
+                val firstMoveResult = indexOfFirstInstructionOrThrow(0, Opcode.MOVE_RESULT_OBJECT)
+                val hotConfigGroupResultIndex = indexOfFirstInstructionOrThrow(firstMoveResult + 1, Opcode.MOVE_RESULT_OBJECT)
 
+                // Inject giả mạo vào thanh ghi v1
                 addInstructions(
                     hotConfigGroupResultIndex + 1,
                     """
-                        invoke-static {$hotConfigReg}, $EXTENSION_CLASS_DESCRIPTOR->getHotConfigGroup(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object $hotConfigReg
-                    """
-                )
-
-                // --- 2. HOT HASH DATA ---
-                val hotStoredTimestampResultIndex = indexOfFirstInstructionOrThrow(hotConfigGroupResultIndex, Opcode.MOVE_RESULT_WIDE)
-                val hotHashDataInvokeIndex = indexOfFirstInstructionOrThrow(hotStoredTimestampResultIndex, Opcode.INVOKE_INTERFACE)
-                val hotHashDataResultIndex = indexOfFirstInstructionOrThrow(hotHashDataInvokeIndex, Opcode.MOVE_RESULT_OBJECT)
-                
-                val hotHashReg = implementation!!.instructions.elementAt(hotHashDataResultIndex).getRegister()
-
-                addInstructions(
-                    hotHashDataResultIndex + 1,
-                    """
-                        invoke-static {$hotHashReg}, $EXTENSION_CLASS_DESCRIPTOR->getHotHashData(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object $hotHashReg
+                        invoke-static {v1}, $EXTENSION_CLASS_DESCRIPTOR->getHotConfigGroup(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v1
                     """
                 )
             }
         }
 
+        // ==========================================
+        // 2. XỬ LÝ COLD CONFIG (Chặn lúc GHI - WRITE)
+        // ==========================================
         coldConfigPreferenceFingerprint.matchOrThrow().let { match ->
             match.method.apply {
-                // --- 3. COLD HASH DATA ---
-                val coldHashDataStrIndex = match.stringMatches!![2].index
                 
-                // Lấy lệnh iget-object gần nhất phía trước chuỗi cold_hash_data
-                val coldHashIgetObjectIndex = implementation!!.instructions.take(coldHashDataStrIndex)
-                    .indexOfLast { it.opcode == Opcode.IGET_OBJECT }
+                // --- Xử lý cho cold_hash_data ---
+                // Smali: const-string v5, "cold_hash_data". Dữ liệu ghi đang nằm ở v3.
+                // Vị trí chuỗi "cold_hash_data" là index 2 trong list strings khai báo ở fingerprint.
+                val coldHashDataStringIndex = match.stringMatches!![2].index
                 
-                val coldHashReg = implementation!!.instructions.elementAt(coldHashIgetObjectIndex).getRegister()
-
+                // Inject tráo dữ liệu v3 ngay sau khi nó được chuẩn bị
                 addInstructions(
-                    coldHashIgetObjectIndex + 1,
+                    coldHashDataStringIndex + 1,
                     """
-                        invoke-static {$coldHashReg}, $EXTENSION_CLASS_DESCRIPTOR->getColdHashData(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object $coldHashReg
+                        invoke-static {v3}, $EXTENSION_CLASS_DESCRIPTOR->getColdHashData(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v3
                     """
                 )
 
-                // --- 4. COLD CONFIG GROUP ---
-                val encodeToStringIndex = indexOfFirstInstructionOrThrow(match.stringMatches!![0].index) {
-                    if (opcode != Opcode.INVOKE_STATIC && opcode != Opcode.INVOKE_STATIC_RANGE) return@indexOfFirstInstructionOrThrow false
-                    val methodRef = (this as? ReferenceInstruction)?.reference as? MethodReference
-                    methodRef?.definingClass == "Landroid/util/Base64;" && methodRef.name == "encodeToString"
-                }
-
-                val coldConfigGroupResultIndex = indexOfFirstInstructionOrThrow(encodeToStringIndex, Opcode.MOVE_RESULT_OBJECT)
+                // --- Xử lý cho cold_config_group ---
+                // Smali: Dữ liệu được encode Base64 và trả về lệnh "move-result-object p1".
+                // Vị trí chuỗi "cold_config_group" là index 0 trong list.
+                val coldConfigGroupStringIndex = match.stringMatches!![0].index
                 
-                val coldConfigReg = implementation!!.instructions.elementAt(coldConfigGroupResultIndex).getRegister()
-
+                // Tính từ dòng khai báo chuỗi "cold_config_group", sẽ có 2 lệnh trả về Object:
+                // 1: parseFrom (trả về Laqdy; -> v3)
+                // 2: Base64.encodeToString (trả về String -> p1)
+                val firstObjectResult = indexOfFirstInstructionOrThrow(coldConfigGroupStringIndex, Opcode.MOVE_RESULT_OBJECT)
+                val secondObjectResult = indexOfFirstInstructionOrThrow(firstObjectResult + 1, Opcode.MOVE_RESULT_OBJECT)
+                
+                // Inject tráo chuỗi p1 sau khi decode Base64 thành công và trước khi ghi
                 addInstructions(
-                    coldConfigGroupResultIndex + 1,
+                    secondObjectResult + 1,
                     """
-                        invoke-static {$coldConfigReg}, $EXTENSION_CLASS_DESCRIPTOR->getColdConfigGroup(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object $coldConfigReg
+                        invoke-static {p1}, $EXTENSION_CLASS_DESCRIPTOR->getColdConfigGroup(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object p1
                     """
                 )
             }
         }
+
+/*
+        addPreference(
+            arrayOf(
+                "PREFERENCE_SCREEN: SPOOFING",
+                "SETTINGS: FREEZE_LAYOUT_UPDATES"
+            ),
+            FREEZE_LAYOUT_UPDATES
+        )
+*/
+
     }
 }
