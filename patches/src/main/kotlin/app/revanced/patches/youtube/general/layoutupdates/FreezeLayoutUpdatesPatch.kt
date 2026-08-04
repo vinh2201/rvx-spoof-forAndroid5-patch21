@@ -61,8 +61,8 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
                         move-result-object v3
                     """)
 
-                val encodeToStringIndex = indexOfFirstInstructionOrThrow(match.stringMatches!![0].index, Opcode.INVOKE_STATIC) {
-                    it.instruction.toString().contains("Base64;->encodeToString")
+                val encodeToStringIndex = indexOfFirstInstructionOrThrow(match.stringMatches!![0].index) {
+                    opcode == Opcode.INVOKE_STATIC && toString().contains("Base64;->encodeToString")
                 }
 
                 val coldConfigGroupResultIndex = indexOfFirstInstructionOrThrow(encodeToStringIndex, Opcode.MOVE_RESULT_OBJECT)
