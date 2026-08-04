@@ -29,7 +29,8 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
         // 1. XỬ LÝ HOT CONFIG (TÌM ĐÚNG HÀM GETSTRING)
         // ==========================================
         hotConfigPreferenceFingerprint.matchOrThrow().let { match ->
-            val instructions = match.method.instructions.toList()
+            // Sửa lỗi 1: Trỏ đúng vào implementation!!.instructions
+            val instructions = match.mutableMethod.implementation!!.instructions.toList()
             
             // Dò radar tìm đích danh hàm getString()
             val getStringIndex = instructions.indexOfFirst {
@@ -38,9 +39,11 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
             
             if (getStringIndex != -1) {
                 // Tìm move-result-object v1 ngay sau getString
-                val hotConfigGroupResultIndex = indexOfFirstInstructionOrThrow(getStringIndex, Opcode.MOVE_RESULT_OBJECT)
+                // Sửa lỗi 2: Thêm match.mutableMethod. vào trước hàm
+                val hotConfigGroupResultIndex = match.mutableMethod.indexOfFirstInstructionOrThrow(getStringIndex, Opcode.MOVE_RESULT_OBJECT)
                 
-                addInstructions(
+                // Sửa lỗi 3: Thêm match.mutableMethod. vào trước hàm
+                match.mutableMethod.addInstructions(
                     hotConfigGroupResultIndex + 1,
                     """
                         invoke-static {v1}, $EXTENSION_CLASS_DESCRIPTOR->getHotConfigGroup(Ljava/lang/String;)Ljava/lang/String;
@@ -54,12 +57,15 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
         // 2. XỬ LÝ COLD CONFIG (TÌM ĐÚNG BASE64 VÀ NÉ TRY/CATCH)
         // ==========================================
         coldConfigPreferenceFingerprint.matchOrThrow().let { match ->
-            val instructions = match.method.instructions.toList()
+            // Sửa lỗi 1: Trỏ đúng vào implementation!!.instructions
+            val instructions = match.mutableMethod.implementation!!.instructions.toList()
             
             // --- Xử lý cho cold_hash_data ---
             // Tránh chèn vào giữa block try/catch, ta chèn NGAY TRƯỚC dòng const-string (khi v3 đã lấy xong chuỗi nhưng chưa lưu)
             val coldHashDataStringIndex = match.stringMatches!![2].index
-            addInstructions(
+            
+            // Sửa lỗi 3: Thêm match.mutableMethod. vào trước hàm
+            match.mutableMethod.addInstructions(
                 coldHashDataStringIndex, // Chú ý: Không có + 1 ở đây, chèn đè lên trước
                 """
                     invoke-static {v3}, $EXTENSION_CLASS_DESCRIPTOR->getColdHashData(Ljava/lang/String;)Ljava/lang/String;
@@ -75,9 +81,11 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
             
             if (base64Index != -1) {
                 // Tìm move-result-object p1 ngay sau Base64
-                val p1ResultIndex = indexOfFirstInstructionOrThrow(base64Index, Opcode.MOVE_RESULT_OBJECT)
+                // Sửa lỗi 2: Thêm match.mutableMethod. vào trước hàm
+                val p1ResultIndex = match.mutableMethod.indexOfFirstInstructionOrThrow(base64Index, Opcode.MOVE_RESULT_OBJECT)
                 
-                addInstructions(
+                // Sửa lỗi 3: Thêm match.mutableMethod. vào trước hàm
+                match.mutableMethod.addInstructions(
                     p1ResultIndex + 1,
                     """
                         invoke-static {p1}, $EXTENSION_CLASS_DESCRIPTOR->getColdConfigGroup(Ljava/lang/String;)Ljava/lang/String;
