@@ -25,12 +25,12 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
     execute {
         hotConfigPreferenceFingerprint.matchOrThrow().let { match ->
             match.method.apply {
-                val hotConfigGroupResultIndex = match.stringMatches!!.first().index - 1
+                val hotConfigGroupResultIndex = match.stringMatches!!.first().index - 2
                 addInstructions(
                     hotConfigGroupResultIndex + 1,
                     """
-                        invoke-static {v5}, $EXTENSION_CLASS_DESCRIPTOR->getHotConfigGroup(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object v5
+                        invoke-static {v1}, $EXTENSION_CLASS_DESCRIPTOR->getHotConfigGroup(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v1
                     """
                 )
 
@@ -38,34 +38,38 @@ val freezeLayoutUpdatesPatch = bytecodePatch(
                 /* This looks like not necessary.
                 addInstructions(hotStoredTimestampResultIndex + 1,
                     """
-                        invoke-static {v10, v11}, $EXTENSION_CLASS_DESCRIPTOR->getHotStoredTimestamp(J)J
-                        move-result-wide v10
+                        invoke-static {v4, v5}, $EXTENSION_CLASS_DESCRIPTOR->getHotStoredTimestamp(J)J
+                        move-result-wide v4
                     """)
                  */
 
                 val hotHashDataResultIndex = indexOfFirstInstructionOrThrow(hotStoredTimestampResultIndex, Opcode.INVOKE_INTERFACE) + 1
                 addInstructions(hotHashDataResultIndex + 1,
                     """
-                        invoke-static {v2}, $EXTENSION_CLASS_DESCRIPTOR->getHotHashData(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object v2
+                        invoke-static {v0}, $EXTENSION_CLASS_DESCRIPTOR->getHotHashData(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v0
                     """)
             }
         }
 
         coldConfigPreferenceFingerprint.matchOrThrow().let { match ->
             match.method.apply {
-                val coldHashDataResultIndex = match.stringMatches!![2].index + 3
-                addInstructions(coldHashDataResultIndex + 1,
+                val coldHashDataResultIndex = match.stringMatches!![2].index - 2
+                addInstructions(coldHashDataResultIndex,
                     """
-                        invoke-static {v0}, $EXTENSION_CLASS_DESCRIPTOR->getColdHashData(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object v0
+                        invoke-static {v3}, $EXTENSION_CLASS_DESCRIPTOR->getColdHashData(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object v3
                     """)
 
-                val coldConfigGroupResultIndex = match.stringMatches!![0].index + 3
+                val encodeToStringIndex = indexOfFirstInstructionOrThrow(match.stringMatches!![0].index, Opcode.INVOKE_STATIC) {
+                    it.instruction.toString().contains("Base64;->encodeToString")
+                }
+
+                val coldConfigGroupResultIndex = indexOfFirstInstructionOrThrow(encodeToStringIndex, Opcode.MOVE_RESULT_OBJECT)
                 addInstructions(coldConfigGroupResultIndex + 1,
                     """
-                        invoke-static {v1}, $EXTENSION_CLASS_DESCRIPTOR->getColdConfigGroup(Ljava/lang/String;)Ljava/lang/String;
-                        move-result-object v1
+                        invoke-static {p1}, $EXTENSION_CLASS_DESCRIPTOR->getColdConfigGroup(Ljava/lang/String;)Ljava/lang/String;
+                        move-result-object p1
                     """)
 
                 /* This looks like not necessary.

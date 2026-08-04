@@ -1,69 +1,78 @@
 package app.revanced.extension.youtube.patches.utils;
 
-// import app.revanced.extension.youtube.settings.Settings;
-import android.os.SystemClock;
+import app.revanced.extension.youtube.settings.Settings;
 
 @SuppressWarnings("unused")
 public class FreezeLayoutUpdatesPatch {
 
-    // Dùng elapsedRealtime an toàn hơn currentTimeMillis cho việc đếm giờ lúc khởi động
-    private static final long START_TIME = SystemClock.elapsedRealtime();
-    private static final long DELAY_MS = 15000; // 15 giây
+    private static final boolean enabled = Settings.FREEZE_LAYOUT_UPDATES.get();
+    private static final boolean disableLayoutUpdates = Settings.DISABLE_LAYOUT_UPDATES.get();
+    //public static boolean freezeTimestamp = Settings.FREEZE_LAYOUT_UPDATES_TIMESTAMP.get();
 
-    // Bộ nhớ đệm (Cache) để lưu trữ config lúc app mới mở
-    private static String cachedHotConfigGroup = null;
-    private static String cachedHotHashData = null;
-    private static String cachedColdConfigGroup = null;
-    private static String cachedColdHashData = null;
-
-    /**
-     * Kiểm tra xem đã qua 15 giây chưa
-     */
-    private static boolean isReadyToFreeze() {
-        return (SystemClock.elapsedRealtime() - START_TIME) >= DELAY_MS;
-    }
 
     public static String getHotConfigGroup(String original) {
-        if (!isReadyToFreeze()) {
-            // Trong 15s đầu: LƯU LẠI config gốc chuẩn bị cho việc đóng băng
-            if (original != null && !original.isEmpty()) {
-                cachedHotConfigGroup = original;
+        if (enabled) {
+            String savedValue = Settings.FROZEN_HOT_CONFIG_GROUP.get();
+            // Default value of config groups are null, but ReVanced's StringSetting doesn't support saving null.
+            if (disableLayoutUpdates || savedValue.isEmpty()) {
+                return null;
             }
-            return original; // Vẫn cho app load bình thường
+            return savedValue;
         }
-        
-        // Sau 15s: Bắt đầu đóng băng! 
-        // Trả về dữ liệu đã lưu, nếu không có thì mới đành dùng đồ zin
-        return (cachedHotConfigGroup != null) ? cachedHotConfigGroup : original;
+        return original;
     }
 
     public static String getHotHashData(String original) {
-        if (!isReadyToFreeze()) {
-            if (original != null && !original.isEmpty()) {
-                cachedHotHashData = original;
+        if (enabled) {
+            if (disableLayoutUpdates) {
+                return "";
             }
-            return original;
+            return Settings.FROZEN_HOT_HASH_DATA.get();
         }
-        return (cachedHotHashData != null) ? cachedHotHashData : original;
+        return original;
     }
 
     public static String getColdConfigGroup(String original) {
-        if (!isReadyToFreeze()) {
-            if (original != null && !original.isEmpty()) {
-                cachedColdConfigGroup = original;
+        if (enabled) {
+            String savedValue = Settings.FROZEN_COLD_CONFIG_GROUP.get();
+            // Default value of config groups are null, but ReVanced's StringSetting doesn't support saving null.
+            if (disableLayoutUpdates || savedValue.isEmpty()) {
+                return null;
             }
-            return original;
+            return savedValue;
         }
-        return (cachedColdConfigGroup != null) ? cachedColdConfigGroup : original;
+        return original;
     }
 
     public static String getColdHashData(String original) {
-        if (!isReadyToFreeze()) {
-            if (original != null && !original.isEmpty()) {
-                cachedColdHashData = original;
+        if (enabled) {
+            if (disableLayoutUpdates) {
+                return "";
             }
-            return original;
+            return Settings.FROZEN_COLD_HASH_DATA.get();
         }
-        return (cachedColdHashData != null) ? cachedColdHashData : original;
+        return original;
     }
+
+    /*
+    public static long getHotStoredTimestamp(long original) {
+        if (enabled && disableLayoutUpdates) {
+            return -1;
+        }
+        if (enabled && freezeTimestamp) {
+            return Settings.FROZEN_HOT_STORED_TIMESTAMP.get();
+        }
+        return original;
+    }
+
+    public static long getColdStoredTimestamp(long original) {
+        if (enabled && disableLayoutUpdates) {
+            return -1;
+        }
+        if (enabled && freezeTimestamp) {
+            return Settings.FROZEN_COLD_STORED_TIMESTAMP.get();
+        }
+        return original;
+    }
+    */
 }
